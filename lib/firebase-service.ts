@@ -11,7 +11,7 @@ import {
   query,
   where,
   orderBy,
-  limit,
+  
   Timestamp,
   writeBatch
 } from 'firebase/firestore';
@@ -32,12 +32,12 @@ const toTimestamp = (date: Date) => Timestamp.fromDate(date);
 const fromTimestamp = (timestamp: Timestamp) => timestamp.toDate();
 
 // Güvenli timestamp dönüştürme
-const safeFromTimestamp = (timestamp: any): Date => {
-  if (!timestamp || typeof timestamp.toDate !== 'function') {
+const safeFromTimestamp = (timestamp: unknown): Date => {
+  if (!timestamp || typeof (timestamp as { toDate?: unknown })?.toDate !== 'function') {
     return new Date();
   }
   try {
-    return timestamp.toDate();
+    return (timestamp as { toDate: () => Date }).toDate();
   } catch (error) {
     console.warn('Invalid timestamp:', timestamp);
     return new Date();
@@ -89,9 +89,10 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
       createdAt: safeFromTimestamp(data.createdAt),
       updatedAt: safeFromTimestamp(data.updatedAt)
     } as User;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting user by email:', error);
-    throw new Error(`Kullanıcı bilgileri alınamadı: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Kullanıcı bilgileri alınamadı: ${message}`);
   }
 };
 
@@ -107,9 +108,10 @@ export const saveUser = async (userData: Omit<User, 'id'>): Promise<User> => {
       id: userRef.id,
       ...userData
     } as User;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving user:', error);
-    throw new Error(`Kullanıcı kaydedilemedi: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Kullanıcı kaydedilemedi: ${message}`);
   }
 };
 
@@ -131,7 +133,7 @@ export const getAllUsers = async (): Promise<User[]> => {
 
 export const updateUser = async (userId: string, updates: Partial<User>): Promise<void> => {
   const userRef = doc(db, COLLECTIONS.USERS, userId);
-  const updatedData: any = { ...updates, updatedAt: toTimestamp(new Date()) };
+  const updatedData: Record<string, unknown> = { ...updates, updatedAt: toTimestamp(new Date()) };
   
   // Timestamp alanları varsa dönüştür
   if (updatedData.createdAt instanceof Date) {
@@ -223,7 +225,7 @@ export const getAllCarriers = async (): Promise<Carrier[]> => {
 
 export const updateCarrier = async (carrierId: string, updates: Partial<Carrier>): Promise<void> => {
   const carrierRef = doc(db, COLLECTIONS.CARRIERS, carrierId);
-  const updatedData: any = { ...updates, updatedAt: toTimestamp(new Date()) };
+  const updatedData: Record<string, unknown> = { ...updates, updatedAt: toTimestamp(new Date()) };
   
   if (updatedData.createdAt instanceof Date) {
     updatedData.createdAt = toTimestamp(updatedData.createdAt);
@@ -367,11 +369,19 @@ export const getOperation = async (operationId: string): Promise<Operation | nul
     yuklemetarihi: fromTimestamp(data.yuklemetarihi),
     bosaltmaTarihi: fromTimestamp(data.bosaltmaTarihi),
     siparisTarihi: fromTimestamp(data.siparisTarihi),
-    documents: data.documents?.map((doc: any) => ({
-      ...doc,
-      uploadedAt: fromTimestamp(doc.uploadedAt),
-      faturaTarihi: doc.faturaTarihi ? fromTimestamp(doc.faturaTarihi) : null
-    })) || []
+    documents: data.documents?.map((doc: unknown) => {
+      const d = doc as Record<string, unknown>;
+      return {
+  id: String(d.id ?? ''),
+  type: (d.type as unknown) as Document['type'],
+        evrakNo: d.evrakNo ? String(d.evrakNo) : undefined,
+        fileName: String(d.fileName ?? ''),
+        fileUrl: String(d.fileUrl ?? ''),
+        uploadedAt: safeFromTimestamp(d.uploadedAt),
+        uploadedBy: String(d.uploadedBy ?? ''),
+        faturaTarihi: d.faturaTarihi ? safeFromTimestamp(d.faturaTarihi) : undefined
+      } as Document;
+    }) || []
   } as Operation;
 };
 
@@ -393,11 +403,19 @@ export const getActiveOperations = async (): Promise<Operation[]> => {
       yuklemetarihi: safeFromTimestamp(data.yuklemetarihi),
       bosaltmaTarihi: safeFromTimestamp(data.bosaltmaTarihi),
       siparisTarihi: safeFromTimestamp(data.siparisTarihi),
-      documents: data.documents?.map((doc: any) => ({
-        ...doc,
-        uploadedAt: safeFromTimestamp(doc.uploadedAt),
-        faturaTarihi: doc.faturaTarihi ? safeFromTimestamp(doc.faturaTarihi) : null
-      })) || []
+      documents: data.documents?.map((doc: unknown) => {
+        const d = doc as Record<string, unknown>;
+        return {
+          id: String(d.id ?? ''),
+          type: (d.type as unknown) as Document['type'],
+          evrakNo: d.evrakNo ? String(d.evrakNo) : undefined,
+          fileName: String(d.fileName ?? ''),
+          fileUrl: String(d.fileUrl ?? ''),
+          uploadedAt: safeFromTimestamp(d.uploadedAt),
+          uploadedBy: String(d.uploadedBy ?? ''),
+          faturaTarihi: d.faturaTarihi ? safeFromTimestamp(d.faturaTarihi) : undefined
+        } as Document;
+      }) || []
     } as Operation;
   });
 };
@@ -419,11 +437,19 @@ export const getAllOperations = async (): Promise<Operation[]> => {
       yuklemetarihi: safeFromTimestamp(data.yuklemetarihi),
       bosaltmaTarihi: safeFromTimestamp(data.bosaltmaTarihi),
       siparisTarihi: safeFromTimestamp(data.siparisTarihi),
-      documents: data.documents?.map((doc: any) => ({
-        ...doc,
-        uploadedAt: safeFromTimestamp(doc.uploadedAt),
-        faturaTarihi: doc.faturaTarihi ? safeFromTimestamp(doc.faturaTarihi) : null
-      })) || []
+      documents: data.documents?.map((doc: unknown) => {
+        const d = doc as Record<string, unknown>;
+        return {
+          id: String(d.id ?? ''),
+          type: (d.type as unknown) as Document['type'],
+          evrakNo: d.evrakNo ? String(d.evrakNo) : undefined,
+          fileName: String(d.fileName ?? ''),
+          fileUrl: String(d.fileUrl ?? ''),
+          uploadedAt: safeFromTimestamp(d.uploadedAt),
+          uploadedBy: String(d.uploadedBy ?? ''),
+          faturaTarihi: d.faturaTarihi ? safeFromTimestamp(d.faturaTarihi) : undefined
+        } as Document;
+      }) || []
     } as Operation;
   });
 };
@@ -446,18 +472,26 @@ export const getInactiveOperations = async (): Promise<Operation[]> => {
       yuklemetarihi: safeFromTimestamp(data.yuklemetarihi),
       bosaltmaTarihi: safeFromTimestamp(data.bosaltmaTarihi),
       siparisTarihi: safeFromTimestamp(data.siparisTarihi),
-      documents: data.documents?.map((doc: any) => ({
-        ...doc,
-        uploadedAt: safeFromTimestamp(doc.uploadedAt),
-        faturaTarihi: doc.faturaTarihi ? safeFromTimestamp(doc.faturaTarihi) : null
-      })) || []
+      documents: data.documents?.map((doc: unknown) => {
+        const d = doc as Record<string, unknown>;
+        return {
+          id: String(d.id ?? ''),
+          type: (d.type as unknown) as Document['type'],
+          evrakNo: d.evrakNo ? String(d.evrakNo) : undefined,
+          fileName: String(d.fileName ?? ''),
+          fileUrl: String(d.fileUrl ?? ''),
+          uploadedAt: safeFromTimestamp(d.uploadedAt),
+          uploadedBy: String(d.uploadedBy ?? ''),
+          faturaTarihi: d.faturaTarihi ? safeFromTimestamp(d.faturaTarihi) : undefined
+        } as Document;
+      }) || []
     } as Operation;
   });
 };
 
 export const updateOperation = async (operationId: string, updates: Partial<Operation>): Promise<void> => {
   const operationRef = doc(db, COLLECTIONS.OPERATIONS, operationId);
-  const updatedData: any = { ...updates, updatedAt: toTimestamp(new Date()) };
+  const updatedData: Record<string, unknown> = { ...updates, updatedAt: toTimestamp(new Date()) };
   
   // Timestamp alanlarını dönüştür
   if (updatedData.createdAt instanceof Date) {
@@ -473,7 +507,7 @@ export const updateOperation = async (operationId: string, updates: Partial<Oper
     updatedData.siparisTarihi = toTimestamp(updatedData.siparisTarihi);
   }
   if (updatedData.documents) {
-    updatedData.documents = updatedData.documents.map((doc: any) => ({
+    updatedData.documents = (updatedData.documents as Document[]).map((doc: Document) => ({
       ...doc,
       uploadedAt: toTimestamp(doc.uploadedAt),
       faturaTarihi: doc.faturaTarihi ? toTimestamp(doc.faturaTarihi) : null

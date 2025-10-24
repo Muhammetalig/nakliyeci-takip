@@ -166,9 +166,7 @@ export interface CarrierFormData {
   vehicles: Omit<Vehicle, 'id'>[];
 }
 
-export interface OperationFormData extends Omit<Operation, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'documents' | 'status' | 'isActive' | 'kar' | 'karYuzde'> {
-  // Kar otomatik hesaplanacak
-}
+export type OperationFormData = Omit<Operation, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'documents' | 'status' | 'isActive' | 'kar' | 'karYuzde'>;
 
 // Dashboard istatistikleri
 export interface DashboardStats {

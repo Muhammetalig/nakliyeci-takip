@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 
 const CarrierListPage: React.FC = () => {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [loadingCarriers, setLoadingCarriers] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -156,13 +156,14 @@ const CarrierListPage: React.FC = () => {
     <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       {/* Sidebar */}
       <aside style={{
-        width: "240px",
-        background: "white",
-        boxShadow: "2px 0 4px rgba(0, 0, 0, 0.1)",
-        padding: "24px 0",
-        position: "fixed",
-        height: "100vh",
-        overflowY: "auto"
+        width: '240px',
+        background: 'white',
+        boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)',
+        padding: '24px 0 80px 0',
+        position: 'fixed',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {/* Logo */}
         <div style={{
@@ -181,7 +182,7 @@ const CarrierListPage: React.FC = () => {
         </div>
 
         {/* Navigation Menu */}
-        <nav style={{ padding: "0 16px" }}>
+        <nav style={{ padding: '0 16px', flex: 1, overflowY: 'auto' }}>
           <div style={{
             borderRadius: "8px",
             margin: "4px 0",
@@ -254,6 +255,30 @@ const CarrierListPage: React.FC = () => {
             </div>
           </div>
         </nav>
+
+        {/* Logout Button */}
+        <div style={{ padding: '0 16px 16px 16px' }}>
+          <button
+            onClick={async () => { await logout(); router.replace('/login'); }}
+            style={{
+              width: '100%',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              justifyContent: 'center'
+            }}
+          >
+            🚪 Çıkış Yap
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -348,7 +373,7 @@ const CarrierListPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="Carrier Name"
+                    placeholder="Taşıyıcı Adı"
                     value={formData.firmaAdi}
                     onChange={(e) => handleInputChange('firmaAdi', e.target.value)}
                     style={{
@@ -373,7 +398,7 @@ const CarrierListPage: React.FC = () => {
                   </label>
                   <input
                     type="tel"
-                    placeholder="+90 (555) 123-4567"
+                    placeholder="Telefon numarası giriniz"
                     value={formData.telefon}
                     onChange={(e) => handleInputChange('telefon', e.target.value)}
                     style={{
@@ -398,7 +423,7 @@ const CarrierListPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="abc@mecotech.com"
+                    placeholder="ornek@eposta.com"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     style={{
@@ -423,7 +448,7 @@ const CarrierListPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="IBAN veya hesap numarası"
+                    placeholder="IBAN veya hesap no"
                     value={formData.iban}
                     onChange={(e) => handleInputChange('iban', e.target.value)}
                     style={{
@@ -480,7 +505,7 @@ const CarrierListPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="123 Örnek Sokak, İstanbul, Türkiye"
+                    placeholder="Adres giriniz"
                     value={formData.adres}
                     onChange={(e) => handleInputChange('adres', e.target.value)}
                     style={{
@@ -533,7 +558,7 @@ const CarrierListPage: React.FC = () => {
                 color: "#1f2937",
                 margin: 0
               }}>
-                Existing Carriers
+                Mevcut Taşıyıcılar
               </h2>
             </div>
 
@@ -619,7 +644,7 @@ const CarrierListPage: React.FC = () => {
                         color: "#374151",
                         borderBottom: "1px solid #e5e7eb"
                       }}>
-                        Created Date
+                        Oluşturulma Tarihi
                       </th>
                       <th style={{
                         padding: "12px 16px",
@@ -629,7 +654,7 @@ const CarrierListPage: React.FC = () => {
                         color: "#374151",
                         borderBottom: "1px solid #e5e7eb"
                       }}>
-                        Updated Date
+                        Güncellenme Tarihi
                       </th>
                       <th style={{
                         padding: "12px 16px",
@@ -639,7 +664,7 @@ const CarrierListPage: React.FC = () => {
                         color: "#374151",
                         borderBottom: "1px solid #e5e7eb"
                       }}>
-                        E-Mail
+                        E-posta
                       </th>
                       <th style={{
                         padding: "12px 16px",

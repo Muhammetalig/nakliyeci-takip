@@ -1,5 +1,4 @@
-'use client';
-
+"use client";
 import React, { useState } from 'react';
 import { createUser } from '../../lib/firebase-service';
 import { User } from '../../lib/types';
@@ -41,9 +40,10 @@ const SetupPage: React.FC = () => {
       console.log('Staff user created with ID:', staffUserId);
       toast.success('Personel kullanıcısı da oluşturuldu!');
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating admin user:', error);
-      toast.error('Kullanıcı oluşturulurken hata: ' + error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Kullanıcı oluşturulurken hata: ' + message);
     } finally {
       setLoading(false);
     }
