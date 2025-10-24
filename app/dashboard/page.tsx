@@ -76,13 +76,14 @@ const DashboardPage: React.FC = () => {
     }}>
       {/* Sidebar */}
       <aside style={{
-        width: "240px",
-        background: "white",
-        boxShadow: "2px 0 4px rgba(0, 0, 0, 0.1)",
-        padding: "24px 0",
-        position: "fixed",
-        height: "100vh",
-        overflowY: "auto"
+        width: '240px',
+        background: 'white',
+        boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)',
+        padding: '24px 0 80px 0',
+        position: 'fixed',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {/* Logo */}
         <div style={{
@@ -101,7 +102,7 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Navigation Menu */}
-        <nav style={{ padding: "0 16px" }}>
+        <nav style={{ padding: '0 16px', flex: 1, overflowY: 'auto' }}>
           <div style={{
             background: "#3b82f6",
             borderRadius: "8px",
@@ -174,6 +175,28 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </nav>
+        <div style={{ padding: '0 16px 16px 16px' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              justifyContent: 'center'
+            }}
+          >
+            🚪 Çıkış Yap
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -414,7 +437,7 @@ const DashboardPage: React.FC = () => {
                     margin: 0,
                     fontWeight: "500"
                   }}>
-                    Fatura #INV-20240715 Carrier Alfa'dan bekleniyor
+                    Fatura #INV-20240715 Carrier Alfa&apos;dan bekleniyor
                   </p>
                 </div>
                 <span style={{

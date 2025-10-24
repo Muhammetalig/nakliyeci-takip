@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 const OperationsPage: React.FC = () => {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [loadingCarriers, setLoadingCarriers] = useState(true);
@@ -177,13 +177,14 @@ const OperationsPage: React.FC = () => {
     <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       {/* Sidebar */}
       <aside style={{
-        width: "240px",
-        background: "white",
-        boxShadow: "2px 0 4px rgba(0, 0, 0, 0.1)",
-        padding: "24px 0",
-        position: "fixed",
-        height: "100vh",
-        overflowY: "auto"
+        width: '240px',
+        background: 'white',
+        boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+        padding: '24px 0 80px 0',
+        position: 'fixed',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {/* Logo */}
         <div style={{
@@ -202,7 +203,7 @@ const OperationsPage: React.FC = () => {
         </div>
 
         {/* Navigation Menu */}
-        <nav style={{ padding: "0 16px" }}>
+        <nav style={{ padding: '0 16px', flex: 1, overflowY: 'auto' }}>
           <div style={{
             borderRadius: "8px",
             margin: "4px 0",
@@ -275,6 +276,28 @@ const OperationsPage: React.FC = () => {
             </div>
           </div>
         </nav>
+        <div style={{ padding: '0 16px 16px 16px' }}>
+          <button
+            onClick={async () => { await logout(); router.replace('/login'); }}
+            style={{
+              width: '100%',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              justifyContent: 'center'
+            }}
+          >
+            🚪 Çıkış Yap
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -390,7 +413,7 @@ const OperationsPage: React.FC = () => {
             <div style={{ position: "relative", minWidth: "280px" }}>
               <input
                 type="text"
-                placeholder="Search carrier..."
+                placeholder="Taşıyıcıda ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -454,7 +477,7 @@ const OperationsPage: React.FC = () => {
                 minWidth: "140px"
               }}
             >
-              <option value="">Select status</option>
+              <option value="">Durum seçin</option>
               <option value="tasima_devam_ediyor">Taşıma devam ediyor</option>
               <option value="nakliyeci_odeme_bekliyor">Nakliyeci ödeme bekliyor</option>
               <option value="tasima_tamamlandi">Taşıma tamamlandı</option>
@@ -497,58 +520,34 @@ const OperationsPage: React.FC = () => {
                     borderRadius: "8px",
                     padding: "16px 20px",
                     boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-                    display: "flex",
+                    display: "grid",
+                    gridTemplateColumns: "180px 160px 1fr 180px 160px",
                     alignItems: "center",
-                    justifyContent: "space-between"
+                    gap: "0px"
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1 }}>
-                    <div style={{ minWidth: "120px" }}>
-                      <div style={{ 
-                        fontSize: "14px", 
-                        fontWeight: "600", 
-                        color: "#1f2937",
-                        marginBottom: "2px"
-                      }}>
-                        {operation.carrierName || 'Nakliyeci Bilgisi Eksik'}
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: "flex", 
-                      alignItems: "center", 
-                      gap: "4px",
-                      color: "#6b7280",
-                      fontSize: "14px",
-                      minWidth: "100px"
-                    }}>
-                      📅 {new Date(operation.yuklemetarihi).toLocaleDateString('tr-TR')}
-                    </div>
-
-                    <div style={{ 
-                      fontSize: "14px", 
-                      fontWeight: "600", 
-                      color: "#1f2937",
-                      minWidth: "100px"
-                    }}>
-                      {operation.toplamTutar.toFixed(2)} {operation.paraBirimi}
-                    </div>
-
-                    <div style={{
-                      padding: "4px 8px",
-                      borderRadius: "12px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      background: `${getStatusColor(operation.status)}20`,
-                      color: getStatusColor(operation.status),
-                      minWidth: "140px",
-                      textAlign: "center"
-                    }}>
-                      {getStatusText(operation.status)}
-                    </div>
+                  <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937" }}>
+                    {operation.carrierName || 'Nakliyeci Bilgisi Eksik'}
                   </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#6b7280", fontSize: "14px" }}>
+                    <span role="img" aria-label="Takvim">📅</span> {new Date(operation.yuklemetarihi).toLocaleDateString('tr-TR')}
+                  </div>
+                  <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937" }}>
+                    {operation.toplamTutar.toFixed(2)} {operation.paraBirimi}
+                  </div>
+                  <div style={{
+                    padding: "4px 8px",
+                    borderRadius: "12px",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    background: `${getStatusColor(operation.status)}20`,
+                    color: getStatusColor(operation.status),
+                    minWidth: "140px",
+                    textAlign: "center"
+                  }}>
+                    {getStatusText(operation.status)}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                     <button
                       style={{
                         background: "transparent",
@@ -726,7 +725,7 @@ const OperationsPage: React.FC = () => {
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input
                     type="number"
-                    placeholder="0,00"
+                    placeholder="Tutar giriniz"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     style={{

@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setUser({ ...newUser, id: userId });
               console.log('New user created with ID:', userId);
             }
-          } catch (dbError: any) {
+          } catch (dbError: unknown) {
             console.error('Database error:', dbError);
             // Veritabanı hatası varsa, Firebase kullanıcı bilgileriyle devam et
             const fallbackUser: User = {
@@ -65,15 +65,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               updatedAt: new Date()
             };
             setUser(fallbackUser);
-            setError(`Veritabanı bağlantı hatası: ${dbError.message}`);
+            const dbMessage = dbError instanceof Error ? dbError.message : String(dbError);
+            setError(`Veritabanı bağlantı hatası: ${dbMessage}`);
           }
         } else {
           console.log('No Firebase user found');
           setUser(null);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Auth state change error:', err);
-        setError('Kullanıcı bilgileri alınırken hata oluştu: ' + err.message);
+        const authMessage = err instanceof Error ? err.message : String(err);
+        setError('Kullanıcı bilgileri alınırken hata oluştu: ' + authMessage);
         setUser(null);
       } finally {
         setLoading(false);
@@ -96,12 +98,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       setUser(userData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
       
       // Firebase hata kodlarını kullanıcı dostu mesajlara çevir
       let errorMessage = 'Giriş yapılamadı';
-      switch (err.code) {
+  const errCode = (err as { code?: string })?.code;
+  switch (errCode) {
         case 'auth/invalid-email':
           errorMessage = 'Geçersiz e-posta adresi';
           break;
@@ -118,7 +121,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           errorMessage = 'Çok fazla başarısız deneme. Lütfen daha sonra tekrar deneyin';
           break;
         default:
-          errorMessage = err.message || 'Beklenmeyen bir hata oluştu';
+          errorMessage = (err instanceof Error ? err.message : String(err)) || 'Beklenmeyen bir hata oluştu';
       }
       
       setError(errorMessage);
@@ -133,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await signOut(auth);
       setUser(null);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Logout error:', err);
       setError('Çıkış yapılırken hata oluştu');
     }

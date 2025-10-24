@@ -49,7 +49,15 @@ const AddCarrierPage: React.FC = () => {
   }, [user, loading, router]);
 
   // Form submit
-  const onSubmit = async (data: any) => {
+  type FormValues = {
+    firmaAdi: string;
+    adres: string;
+    telefon: string;
+    iban: string;
+    vehicles: Array<{ plaka?: string; aracTipi?: string }>;
+  };
+
+  const onSubmit = async (data: FormValues) => {
     if (!user) return;
 
     setIsSubmitting(true);
@@ -60,7 +68,7 @@ const AddCarrierPage: React.FC = () => {
         adres: data.adres || 'Belirtilmemiş',
         telefon: data.telefon || 'Belirtilmemiş',
         iban: data.iban || 'Belirtilmemiş',
-        vehicles: data.vehicles?.map((vehicle: any, index: number) => ({
+        vehicles: data.vehicles?.map((vehicle, index: number) => ({
           id: `vehicle_${Date.now()}_${index}`,
           plaka: vehicle.plaka || `PLAKA${index + 1}`,
           aracTipi: vehicle.aracTipi || 'Kamyon'
@@ -73,9 +81,10 @@ const AddCarrierPage: React.FC = () => {
       await createCarrier(carrierData);
       toast.success('Nakliyeci başarıyla eklendi!');
       router.push('/dashboard/carriers');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Nakliyeci eklenirken hata:', error);
-      toast.error('Nakliyeci eklenirken hata oluştu: ' + (error.message || 'Bilinmeyen hata'));
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Nakliyeci eklenirken hata oluştu: ' + (message || 'Bilinmeyen hata'));
     } finally {
       setIsSubmitting(false);
     }
