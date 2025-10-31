@@ -489,7 +489,7 @@ const EditOperationPage: React.FC = () => {
                     <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
                       Seçili: {docs[key].file?.name} {docs[key].uploadedAt ? `• ${docs[key].uploadedAt.toLocaleString('tr-TR')}` : ''}
                       {docs[key].status === 'queued' && (
-                        <div style={{ marginTop: 6, color: '#6b7280' }}>Hazır (Kaydet'e basınca yüklenecek)</div>
+                        <div style={{ marginTop: 6, color: '#6b7280' }}>Hazır (Kaydet&apos;e basınca yüklenecek)</div>
                       )}
                       {docs[key].status !== 'queued' && typeof docs[key].progress === 'number' && (
                         <div style={{ marginTop: 6 }}>
