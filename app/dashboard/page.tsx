@@ -91,14 +91,7 @@ const DashboardPage: React.FC = () => {
           borderBottom: "1px solid #e5e7eb",
           marginBottom: "24px"
         }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "600",
-            color: "#3b82f6",
-            fontStyle: "italic"
-          }}>
-            ✱ logo
-          </div>
+          <img src="/uygulamaicon.jpeg" alt="logo" style={{ height: 56, width: 'auto' }} />
         </div>
 
         {/* Navigation Menu */}
@@ -154,6 +147,42 @@ const DashboardPage: React.FC = () => {
               fontWeight: "500"
             }}>
               📊 Operasyon Yönetimi
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: "8px",
+            margin: "4px 0",
+            color: "#6b7280",
+            cursor: "pointer"
+          }} onClick={() => router.push("/dashboard/operations/new")}>
+            <div style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              🆕 Yeni Operasyon
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: "8px",
+            margin: "4px 0",
+            color: "#6b7280",
+            cursor: "pointer"
+          }} onClick={() => router.push("/dashboard/customers")}>
+            <div style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              👤 Müşteriler
             </div>
           </div>
 
@@ -220,22 +249,7 @@ const DashboardPage: React.FC = () => {
           </h1>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button style={{
-              background: "#3b82f6",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              fontSize: "14px",
-              fontWeight: "500",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px"
-            }}>
-              + Yeni Operasyon
-            </button>
-            
+            {/** İstenildiği üzere sağ üstteki "+ Yeni Operasyon" butonu kaldırıldı. */}
             <div style={{
               width: "40px",
               height: "40px",
@@ -245,7 +259,7 @@ const DashboardPage: React.FC = () => {
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer"
-            }} onClick={handleLogout}>
+            }}>
               👤
             </div>
           </div>

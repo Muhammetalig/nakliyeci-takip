@@ -26,7 +26,13 @@ export interface Vehicle {
 export interface Carrier {
   id: string;
   firmaAdi: string;
+  firmaTuru?: 'Sahis' | 'Limited' | 'Anonim';
+  vergiDairesi?: string;
+  vergiNumarasi?: string;
   adres: string;
+  il?: string;
+  ilce?: string;
+  yetkiliKisi?: string;
   telefon: string;
   iban: string;
   email?: string; // Email adresi
@@ -34,16 +40,25 @@ export interface Carrier {
   createdAt: Date;
   updatedAt: Date;
   createdBy: string; // Kaydı oluşturan kullanıcı ID
+  isActive?: boolean;
 }
 
 // Nakliyeci oluşturma veri tipi
 export interface CreateCarrierData {
   firmaAdi: string;
+  firmaTuru?: 'Sahis' | 'Limited' | 'Anonim';
+  vergiDairesi?: string;
+  vergiNumarasi?: string;
   adres: string;
+  il?: string;
+  ilce?: string;
+  yetkiliKisi?: string;
   telefon: string;
   iban: string;
   email?: string; // Email adresi
-  plaka?: string; // Opsiyonel ilk araç plakası
+  plaka?: string; // Eski kullanım için geriye uyumlu
+  vehicles?: Omit<Vehicle, 'id'>[]; // Çoklu araç girişi
+  isActive?: boolean;
 }
 
 // Operasyon oluşturma veri tipi
@@ -71,10 +86,12 @@ export type TransportType = 'FTL' | 'LTL';
 
 // Belge tipi
 export type DocumentType = 
-  | 'teslim_evraki'      // Teslim Evrakı
-  | 'nakliyeci_faturasi' // Nakliyeci Faturası  
-  | 'musteri_faturasi'   // Müşteri Faturası
-  | 'dekont';            // Ödeme Dekontu
+  | 'teslim_evraki'       // Teslim Evrakı
+  | 'nakliyeci_faturasi'  // Nakliyeci Faturası  
+  | 'musteri_faturasi'    // Müşteri Faturası
+  | 'dekont'              // Ödeme Dekontu
+  | 'ellecleme_belgesi'   // Elleçleme Belgesi (opsiyonel)
+  | 'hammaliye_belgesi';  // Hammaliye Belgesi (opsiyonel)
 
 // Belge tipi
 export interface Document {
@@ -141,6 +158,9 @@ export interface Operation {
   navlunSatisTutari: number;
   kar: number; // otomatik hesaplama = satış - maliyet
   karYuzde: number; // kar yüzdesi
+  // Hizmet faturaları (opsiyonel)
+  elleclemeFaturasi?: boolean;
+  hammaliyeFaturasi?: boolean;
   
   // Şoför bilgileri
   soforAdi: string;
@@ -186,4 +206,36 @@ export interface PaymentReminder {
   currency: Currency;
   daysLeft: number;
   isOverdue: boolean;
+}
+
+// Müşteri tipi
+export interface Customer {
+  id: string;
+  firmaUnvani: string;
+  vergiDairesi: string;
+  vergiNumarasi: string;
+  adres: string;
+  il: string;
+  ilce: string;
+  yetkiliKisi: string;
+  telefon: string;
+  eposta: string;
+  iban: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+}
+
+// Müşteri oluşturma/güncelleme form tipi
+export interface CustomerFormData {
+  firmaUnvani: string;
+  vergiDairesi: string;
+  vergiNumarasi: string;
+  adres: string;
+  il: string;
+  ilce: string;
+  yetkiliKisi: string;
+  telefon: string;
+  eposta: string;
+  iban: string;
 }

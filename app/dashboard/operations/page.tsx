@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/contexts/AuthContext';
-import { getAllCarriers, createOperation, getAllOperations } from '../../../lib/firebase-service';
+import { getAllCarriers, createOperation, getAllOperations, deleteOperation as deleteOperationService, deleteFile } from '../../../lib/firebase-service';
 import { Carrier, CreateOperationData, Operation } from '../../../lib/types';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 const OperationsPage: React.FC = () => {
   const router = useRouter();
@@ -133,6 +134,32 @@ const OperationsPage: React.FC = () => {
     return matchesTab && matchesSearch && matchesStatus && matchesDate;
   });
 
+  // Operasyon silme (dokümanları ile birlikte)
+  const handleDeleteOperation = async (op: Operation) => {
+    if (user?.role !== 'admin') {
+      toast.error('Bu işlem için yetkiniz yok');
+      return;
+    }
+    const ok = window.confirm(`"${op.seferNo}" operasyonunu silmek istiyor musunuz? Bu işlem geri alınamaz.`);
+    if (!ok) return;
+    try {
+      // Storage dosyalarını sil (başarısız olanları atla)
+      const docs = op.documents || [];
+      for (const d of docs) {
+        if (d.fileUrl) {
+          try { await deleteFile(d.fileUrl); } catch { /* ignore */ }
+        }
+      }
+      await deleteOperationService(op.id);
+      const list = await getAllOperations();
+      setOperations(list);
+      toast.success('Operasyon silindi');
+    } catch (e) {
+      console.error(e);
+      toast.error('Operasyon silinirken hata oluştu');
+    }
+  };
+
   const getStatusText = (status: string) => {
     switch (status) {
       case 'tasima_devam_ediyor':
@@ -156,6 +183,87 @@ const OperationsPage: React.FC = () => {
         return '#10b981';
       default:
         return '#6b7280';
+    }
+  };
+
+  const fmt = (d: Date) => {
+    const dd = new Date(d);
+    const y = dd.getFullYear();
+    const m = String(dd.getMonth() + 1).padStart(2, '0');
+    const day = String(dd.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const onExportExcel = () => {
+    try {
+      const headers = [
+        'seferNo','tasimaTipi','carrierName','vehiclePlaka','vehicleType','cekiciPlaka','dorsePlaka','yuklemeTarihi','cikisNoktasi','varisNoktasi','bosaltmaTarihi','yuklemeAdresi','varisAdresi','musteriAdi','gondericiFirma','aliciFirma','tedarikciFirma','siparisTarihi','siparisNo','irsaliyeNo','faturaNo','adet','kg','desi','yukAgirligi','malzemeBilgisi','malBedeli','toplamTutar','paraBirimi','vadeSuresi','soforAdi','soforTelefonu','aracMaliyeti','navlunSatisTutari','kar','karYuzde','elleclemeFaturasi','hammaliyeFaturasi','status','isActive','createdAt','updatedAt','createdBy'
+      ] as const;
+
+      type HeaderKey = typeof headers[number];
+
+      const rows = filteredOperations.map(op => ({
+        seferNo: op.seferNo,
+        tasimaTipi: op.tasimaTipi,
+        carrierName: op.carrierName,
+        vehiclePlaka: op.vehiclePlaka,
+        vehicleType: op.vehicleType,
+        cekiciPlaka: op.cekiciPlaka ?? '',
+        dorsePlaka: op.dorsePlaka ?? '',
+        yuklemeTarihi: fmt(op.yuklemetarihi),
+        cikisNoktasi: op.cikisNoktasi,
+        varisNoktasi: op.varisNoktasi,
+        bosaltmaTarihi: fmt(op.bosaltmaTarihi),
+        yuklemeAdresi: op.yuklemeAdresi,
+        varisAdresi: op.varisAdresi,
+        musteriAdi: op.musteriAdi,
+        gondericiFirma: op.gondericifirma,
+        aliciFirma: op.aliciirma,
+        tedarikciFirma: op.tedarikciirma,
+        siparisTarihi: fmt(op.siparisTarihi),
+        siparisNo: op.siparisNo,
+        irsaliyeNo: op.irsaliyeNo,
+        faturaNo: op.faturaNo,
+        adet: op.adet,
+        kg: op.kg,
+        desi: op.desi,
+        yukAgirligi: op.yukAgirligi,
+        malzemeBilgisi: op.malzemeBilgisi,
+        malBedeli: op.malBedeli,
+        toplamTutar: op.toplamTutar,
+        paraBirimi: op.paraBirimi,
+        vadeSuresi: op.vadeSuresi,
+        soforAdi: op.soforAdi,
+        soforTelefonu: op.soforTelefonu,
+        aracMaliyeti: op.aracMaliyeti,
+        navlunSatisTutari: op.navlunSatisTutari,
+        kar: op.kar,
+        karYuzde: op.karYuzde,
+        elleclemeFaturasi: op.elleclemeFaturasi ? 'Evet' : 'Hayır',
+        hammaliyeFaturasi: op.hammaliyeFaturasi ? 'Evet' : 'Hayır',
+        status: getStatusText(op.status),
+        isActive: op.isActive ? 'Aktif' : 'Pasif',
+        createdAt: fmt(op.createdAt),
+        updatedAt: fmt(op.updatedAt),
+        createdBy: op.createdBy
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows, { header: [...headers] as string[] });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Operasyonlar');
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      const ts = new Date();
+      const name = `operasyonlar-${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}.xlsx`;
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast.success('Excel indirildi');
+    } catch (e) {
+      console.error(e);
+      toast.error('Excel oluşturulamadı');
     }
   };
 
@@ -192,14 +300,7 @@ const OperationsPage: React.FC = () => {
           borderBottom: "1px solid #e5e7eb",
           marginBottom: "24px"
         }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "600",
-            color: "#3b82f6",
-            fontStyle: "italic"
-          }}>
-            ✱ logo
-          </div>
+          <img src="/uygulamaicon.jpeg" alt="logo" style={{ height: 56, width: 'auto' }} />
         </div>
 
         {/* Navigation Menu */}
@@ -255,6 +356,42 @@ const OperationsPage: React.FC = () => {
               fontWeight: "500"
             }}>
               📊 Operasyon Yönetimi
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: "8px",
+            margin: "4px 0",
+            color: "#6b7280",
+            cursor: "pointer"
+          }} onClick={() => router.push("/dashboard/operations/new")}>
+            <div style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              🆕 Yeni Operasyon
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: "8px",
+            margin: "4px 0",
+            color: "#6b7280",
+            cursor: "pointer"
+          }} onClick={() => router.push("/dashboard/customers")}>
+            <div style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              👤 Müşteriler
             </div>
           </div>
 
@@ -321,25 +458,6 @@ const OperationsPage: React.FC = () => {
           </h1>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button
-              onClick={() => setShowNewOperationForm(true)}
-              style={{
-                background: "#3b82f6",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 20px",
-                fontSize: "14px",
-                fontWeight: "500",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              + Yeni Operasyon
-            </button>
-            
             <div style={{
               width: "40px",
               height: "40px",
@@ -499,6 +617,24 @@ const OperationsPage: React.FC = () => {
             >
               Filtreleri Uygula
             </button>
+
+            {/* Export Excel Button */}
+            <button
+              onClick={onExportExcel}
+              style={{
+                background: "#10b981",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 16px",
+                fontSize: "14px",
+                fontWeight: "500",
+                cursor: "pointer",
+                minWidth: "120px"
+              }}
+            >
+              Excel İndir
+            </button>
           </div>
 
           {/* Operations List */}
@@ -521,9 +657,10 @@ const OperationsPage: React.FC = () => {
                     padding: "16px 20px",
                     boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
                     display: "grid",
-                    gridTemplateColumns: "180px 160px 1fr 180px 160px",
+                    // Daha esnek ve taşma yapmayan kolon düzeni
+                    gridTemplateColumns: "180px 160px 1fr auto auto",
                     alignItems: "center",
-                    gap: "0px"
+                    gap: "12px"
                   }}
                 >
                   <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937" }}>
@@ -543,11 +680,15 @@ const OperationsPage: React.FC = () => {
                     background: `${getStatusColor(operation.status)}20`,
                     color: getStatusColor(operation.status),
                     minWidth: "140px",
-                    textAlign: "center"
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    textAlign: "center",
+                    justifySelf: 'start'
                   }}>
                     {getStatusText(operation.status)}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                     <button
                       style={{
                         background: "transparent",
@@ -561,9 +702,46 @@ const OperationsPage: React.FC = () => {
                         alignItems: "center",
                         gap: "4px"
                       }}
+                      onClick={() => router.push(`/dashboard/operations/${operation.id}`)}
                     >
                       📄 Dokümanlar
                     </button>
+                    <button
+                      onClick={() => router.push(`/dashboard/operations/${operation.id}/edit`)}
+                      style={{
+                        background: "#3b82f6",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "6px 12px",
+                        fontSize: "14px",
+                        color: "white",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      ✏️ Düzenle
+                    </button>
+                    {user?.role === 'admin' && (
+                      <button
+                        onClick={() => handleDeleteOperation(operation)}
+                        style={{
+                          background: "#ef4444",
+                          border: "none",
+                          borderRadius: "6px",
+                          padding: "6px 12px",
+                          fontSize: "14px",
+                          color: "white",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        🗑️ Sil
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
