@@ -186,6 +186,12 @@ const OperationsPage: React.FC = () => {
     }
   };
 
+  // Yardımcı: Operasyonun bağlı olduğu nakliyecinin telefonunu getir
+  const getCarrierPhone = (op: Operation) => {
+    const c = carriers.find(ca => ca.id === op.carrierId);
+    return c?.telefon;
+  };
+
   const fmt = (d: Date) => {
     const dd = new Date(d);
     const y = dd.getFullYear();
@@ -658,19 +664,44 @@ const OperationsPage: React.FC = () => {
                     boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
                     display: "grid",
                     // Daha esnek ve taşma yapmayan kolon düzeni
-                    gridTemplateColumns: "180px 160px 1fr auto auto",
+                    // Soldan sağa: Sefer No | Yükleme Tarihi | Nakliyeci + Telefon | Güzergâh | Durum | Aksiyonlar
+                    gridTemplateColumns: "150px 150px 280px 1fr auto auto",
                     alignItems: "center",
                     gap: "12px"
                   }}
                 >
-                  <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937" }}>
-                    {operation.carrierName || 'Nakliyeci Bilgisi Eksik'}
+                  {/* Sefer No */}
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#111827", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {operation.seferNo}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#6b7280", fontSize: "14px" }}>
-                    <span role="img" aria-label="Takvim">📅</span> {new Date(operation.yuklemetarihi).toLocaleDateString('tr-TR')}
+                  {/* Yükleme Tarihi */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#6b7280", fontSize: "14px", whiteSpace: 'nowrap' }}>
+                    <span role="img" aria-label="Takvim">📅</span>
+                    {new Date(operation.yuklemetarihi).toLocaleDateString('tr-TR')}
                   </div>
-                  <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937" }}>
-                    {operation.toplamTutar.toFixed(2)} {operation.paraBirimi}
+                  {/* Nakliyeci Adı + Telefon */}
+                  <div style={{
+                    fontSize: "14px",
+                    color: "#1f2937",
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    minWidth: 0
+                  }}>
+                    <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {operation.carrierName || 'Nakliyeci Bilgisi Eksik'}
+                    </span>
+                    {getCarrierPhone(operation) && (
+                      <span style={{ color: '#6b7280', whiteSpace: 'nowrap' }}>
+                        - {getCarrierPhone(operation)}
+                      </span>
+                    )}
+                  </div>
+                  {/* Güzergâh (sığdığı kadar) */}
+                  <div style={{ fontSize: "14px", color: "#374151", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {(operation.cikisNoktasi && operation.varisNoktasi)
+                      ? `${operation.cikisNoktasi} → ${operation.varisNoktasi}`
+                      : ''}
                   </div>
                   <div style={{
                     padding: "4px 8px",
