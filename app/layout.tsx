@@ -20,7 +20,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>{/* Sayfa içeriğinin bulunduğu ana body */}
-        <AuthProvider>
+        <AuthProvider>  
           {children}{/* Buraya her sayfa (page.tsx) render edilir */}
           <Toaster 
             position="top-right"

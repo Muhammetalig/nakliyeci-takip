@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/contexts/AuthContext';
-import { getAllCarriers, deleteCarrier as deleteCarrierService, createCarrier } from '../../../lib/firebase-service';
-import { Carrier, CreateCarrierData } from '../../../lib/types';
+import { getAllCarriers, deleteCarrier as deleteCarrierService, createCarrier, updateCarrier } from '../../../lib/firebase-service';
+import { Carrier, CreateCarrierData, Vehicle } from '../../../lib/types';
 import { formatDate } from '../../../lib/utils';
 import toast from 'react-hot-toast';
 
@@ -17,14 +17,24 @@ const CarrierListPage: React.FC = () => {
   
   // Form states
   const [formData, setFormData] = useState({
+    firmaTuru: 'Sahis' as 'Sahis' | 'Limited' | 'Anonim',
     firmaAdi: '',
+    vergiDairesi: '',
+    vergiNumarasi: '',
+    adres: '',
+    il: '',
+    ilce: '',
+    yetkiliKisi: '',
     telefon: '',
     email: '',
     iban: '',
-    plaka: '',
-    adres: ''
+    isActive: true,
   });
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehiclePlaka, setVehiclePlaka] = useState('');
+  const [vehicleType, setVehicleType] = useState('Tır');
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Kullanıcı yoksa login sayfasına yönlendir
   useEffect(() => {
@@ -54,11 +64,6 @@ const CarrierListPage: React.FC = () => {
 
   // Nakliyeci silme fonksiyonu
   const handleDelete = async (carrierId: string, carrierName: string) => {
-    if (user?.role !== 'admin') {
-      toast.error('Bu işlem için yetkiniz bulunmamaktadır');
-      return;
-    }
-
     if (window.confirm(`"${carrierName}" nakliyecisini silmek istediğinizden emin misiniz?`)) {
       try {
         await deleteCarrierService(carrierId);
@@ -74,11 +79,22 @@ const CarrierListPage: React.FC = () => {
   };
 
   // Form input değişikliklerini handle et
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleAddVehicle = () => {
+    if (!vehiclePlaka.trim()) return;
+    setVehicles(prev => [...prev, { id: crypto.randomUUID(), plaka: vehiclePlaka.trim(), aracTipi: vehicleType }]);
+    setVehiclePlaka('');
+    setVehicleType('Tır');
+  };
+
+  const handleRemoveVehicle = (id: string) => {
+    setVehicles(prev => prev.filter(v => v.id !== id));
   };
 
   // Nakliyeci ekle fonksiyonu
@@ -100,35 +116,80 @@ const CarrierListPage: React.FC = () => {
     try {
       const carrierData: CreateCarrierData = {
         firmaAdi: formData.firmaAdi.trim(),
+        firmaTuru: formData.firmaTuru,
+        vergiDairesi: formData.vergiDairesi.trim() || undefined,
+        vergiNumarasi: formData.vergiNumarasi.trim() || undefined,
+        adres: formData.adres.trim() || 'Belirtilmemiş',
+        il: formData.il.trim() || undefined,
+        ilce: formData.ilce.trim() || undefined,
+        yetkiliKisi: formData.yetkiliKisi.trim() || undefined,
         telefon: formData.telefon.trim(),
         iban: formData.iban.trim() || 'Belirtilmemiş',
-        adres: formData.adres.trim() || 'Belirtilmemiş',
         email: formData.email.trim() || undefined,
-        plaka: formData.plaka.trim() || undefined
+        vehicles: vehicles.map(v => ({ plaka: v.plaka, aracTipi: v.aracTipi })),
+        isActive: formData.isActive
       };
+      if (editingId) {
+        await updateCarrier(editingId, {
+          ...carrierData,
+          vehicles: vehicles.map(v => ({ id: v.id, plaka: v.plaka, aracTipi: v.aracTipi }))
+        });
+        toast.success('Nakliyeci güncellendi');
+      } else {
+        await createCarrier(carrierData);
+        toast.success('Nakliyeci başarıyla eklendi!');
+      }
 
-      const newCarrier = await createCarrier(carrierData);
-      // Listeyi yeniden yükle (Firebase'den güncel sıralama ile)
+      // Listeyi yeniden yükle ve formu sıfırla
       const updatedCarriersList = await getAllCarriers();
       setCarriers(updatedCarriersList);
-      
-      // Formu sıfırla
-      setFormData({
-        firmaAdi: '',
-        telefon: '',
-        email: '',
-        iban: '',
-        plaka: '',
-        adres: ''
-      });
-
-      toast.success('Nakliyeci başarıyla eklendi!');
+      resetForm();
     } catch (error) {
       console.error('Nakliyeci ekleme hatası:', error);
       toast.error('Nakliyeci eklenirken hata oluştu');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      firmaTuru: 'Sahis',
+      firmaAdi: '',
+      vergiDairesi: '',
+      vergiNumarasi: '',
+      adres: '',
+      il: '',
+      ilce: '',
+      yetkiliKisi: '',
+      telefon: '',
+      email: '',
+      iban: '',
+      isActive: true,
+    });
+    setVehicles([]);
+    setEditingId(null);
+  };
+
+  const handleEdit = (carrier: Carrier) => {
+    setEditingId(carrier.id);
+    setFormData({
+      firmaTuru: (carrier.firmaTuru as 'Sahis' | 'Limited' | 'Anonim') ?? 'Sahis',
+      firmaAdi: carrier.firmaAdi ?? '',
+      vergiDairesi: carrier.vergiDairesi ?? '',
+      vergiNumarasi: carrier.vergiNumarasi ?? '',
+      adres: carrier.adres ?? '',
+      il: carrier.il ?? '',
+      ilce: carrier.ilce ?? '',
+      yetkiliKisi: carrier.yetkiliKisi ?? '',
+      telefon: carrier.telefon ?? '',
+      email: carrier.email ?? '',
+      iban: carrier.iban ?? '',
+      isActive: carrier.isActive ?? true,
+    });
+    setVehicles((carrier.vehicles || []).map(v => ({ id: v.id, plaka: v.plaka, aracTipi: v.aracTipi })));
+    // Sayfanın üstündeki forma kaydırma (isteğe bağlı)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Filtrelenmiş nakliyeciler
@@ -171,14 +232,7 @@ const CarrierListPage: React.FC = () => {
           borderBottom: "1px solid #e5e7eb",
           marginBottom: "24px"
         }}>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "600",
-            color: "#3b82f6",
-            fontStyle: "italic"
-          }}>
-            ✱ logo
-          </div>
+          <img src="/uygulamaicon.jpeg" alt="logo" style={{ height: 56, width: 'auto' }} />
         </div>
 
         {/* Navigation Menu */}
@@ -234,6 +288,42 @@ const CarrierListPage: React.FC = () => {
               fontWeight: "500"
             }}>
               📊 Operasyon Yönetimi
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: "8px",
+            margin: "4px 0",
+            color: "#6b7280",
+            cursor: "pointer"
+          }} onClick={() => router.push("/dashboard/operations/new")}>
+            <div style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              🆕 Yeni Operasyon
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: "8px",
+            margin: "4px 0",
+            color: "#6b7280",
+            cursor: "pointer"
+          }} onClick={() => router.push("/dashboard/customers")}>
+            <div style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              👤 Müşteriler
             </div>
           </div>
 
@@ -298,29 +388,11 @@ const CarrierListPage: React.FC = () => {
             color: "#1f2937",
             margin: 0
           }}>
-            Carrier Management
+            Taşıyıcı Yönetimi
           </h1>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button
-              onClick={() => router.push('/dashboard/carriers/new')}
-              style={{
-                background: "#3b82f6",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 20px",
-                fontSize: "14px",
-                fontWeight: "500",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              + Yeni Operasyon
-            </button>
-            
+            {/** İstenildiği üzere sağ üstteki "+ Yeni Operasyon" butonu şimdilik kaldırıldı. */}
             <div style={{
               width: "40px",
               height: "40px",
@@ -352,16 +424,26 @@ const CarrierListPage: React.FC = () => {
               color: "#1f2937",
               margin: "0 0 24px 0"
             }}>
-              Yeni Taşıyıcı Ekle
+              {editingId ? 'Taşıyıcıyı Düzenle' : 'Yeni Taşıyıcı Ekle'}
             </h2>
 
             <form onSubmit={handleAddCarrier}>
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                gridTemplateColumns: "repeat(4, 1fr)",
                 gap: "16px",
                 marginBottom: "16px"
               }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Firma Türü</label>
+                  <select value={formData.firmaTuru} onChange={(e)=>handleInputChange('firmaTuru', e.target.value)} style={{
+                      width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", boxSizing: "border-box", background:'white'
+                  }}>
+                    <option value="Sahis">Şahıs</option>
+                    <option value="Limited">Limited</option>
+                    <option value="Anonim">Anonim</option>
+                  </select>
+                </div>
                 <div>
                   <label style={{
                     display: "block",
@@ -369,11 +451,11 @@ const CarrierListPage: React.FC = () => {
                     color: "#6b7280",
                     marginBottom: "4px"
                   }}>
-                    Adı
+                    Firma Adı / Ünvan
                   </label>
                   <input
                     type="text"
-                    placeholder="Taşıyıcı Adı"
+                    placeholder="Firma adını giriniz"
                     value={formData.firmaAdi}
                     onChange={(e) => handleInputChange('firmaAdi', e.target.value)}
                     style={{
@@ -385,6 +467,14 @@ const CarrierListPage: React.FC = () => {
                       boxSizing: "border-box"
                     }}
                   />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Vergi Dairesi</label>
+                  <input type="text" placeholder="Vergi dairesi" value={formData.vergiDairesi} onChange={(e)=>handleInputChange('vergiDairesi', e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Vergi Numarası</label>
+                  <input type="text" placeholder="Vergi numarası" value={formData.vergiNumarasi} onChange={(e)=>handleInputChange('vergiNumarasi', e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, boxSizing:'border-box' }} />
                 </div>
 
                 <div>
@@ -444,7 +534,7 @@ const CarrierListPage: React.FC = () => {
                     color: "#6b7280",
                     marginBottom: "4px"
                   }}>
-                    IBAN
+                    Banka IBAN
                   </label>
                   <input
                     type="text"
@@ -465,33 +555,28 @@ const CarrierListPage: React.FC = () => {
 
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 2fr",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr",
                 gap: "16px",
                 marginBottom: "16px"
               }}>
                 <div>
-                  <label style={{
-                    display: "block",
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    marginBottom: "4px"
-                  }}>
-                    Plaka (Opsiyonel)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Plaka giriniz"
-                    value={formData.plaka}
-                    onChange={(e) => handleInputChange('plaka', e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "6px",
-                      fontSize: "14px",
-                      boxSizing: "border-box"
-                    }}
-                  />
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>İl</label>
+                  <input type="text" placeholder="İl" value={formData.il} onChange={(e)=>handleInputChange('il', e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>İlçe</label>
+                  <input type="text" placeholder="İlçe" value={formData.ilce} onChange={(e)=>handleInputChange('ilce', e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Yetkili Kişi (Ad Soyad)</label>
+                  <input type="text" placeholder="Yetkili kişi" value={formData.yetkiliKisi} onChange={(e)=>handleInputChange('yetkiliKisi', e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>Aktif / Pasif</label>
+                  <select value={formData.isActive ? 'aktif' : 'pasif'} onChange={(e)=>handleInputChange('isActive', e.target.value === 'aktif')} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, background:'white' }}>
+                    <option value="aktif">Aktif</option>
+                    <option value="pasif">Pasif</option>
+                  </select>
                 </div>
 
                 <div>
@@ -520,7 +605,54 @@ const CarrierListPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ textAlign: "right" }}>
+              {/* Araç Yönetimi */}
+              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 12, marginTop: 8 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', margin: '0 0 12px 0' }}>Araçlar</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end', marginBottom: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Plaka</label>
+                    <input value={vehiclePlaka} onChange={(e)=>setVehiclePlaka(e.target.value)} placeholder="Örn: 34 ABC 123" style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14 }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Araç Tipi</label>
+                    <select value={vehicleType} onChange={(e)=>setVehicleType(e.target.value)} style={{ width:'100%', padding:'8px 12px', border:'1px solid #d1d5db', borderRadius:6, fontSize:14, background:'white' }}>
+                      <option>Tır</option>
+                      <option>Kamyon</option>
+                      <option>Kamyonet</option>
+                    </select>
+                  </div>
+                  <button type="button" onClick={handleAddVehicle} style={{ background:'#10b981', color:'white', border:'none', borderRadius:6, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>+ Araç Ekle</button>
+                </div>
+                {vehicles.length > 0 && (
+                  <div style={{ border:'1px solid #e5e7eb', borderRadius:8, overflow:'hidden' }}>
+                    <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                      <thead>
+                        <tr style={{ background:'#f9fafb' }}>
+                          <th style={{ padding:'8px 12px', textAlign:'left', fontSize:12, color:'#374151' }}>Plaka</th>
+                          <th style={{ padding:'8px 12px', textAlign:'left', fontSize:12, color:'#374151' }}>Araç Tipi</th>
+                          <th style={{ padding:'8px 12px', textAlign:'center', fontSize:12, color:'#374151' }}>Sil</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vehicles.map(v => (
+                          <tr key={v.id} style={{ borderTop:'1px solid #f3f4f6' }}>
+                            <td style={{ padding:'10px 12px' }}>{v.plaka}</td>
+                            <td style={{ padding:'10px 12px' }}>{v.aracTipi}</td>
+                            <td style={{ padding:'10px 12px', textAlign:'center' }}>
+                              <button type="button" onClick={()=>handleRemoveVehicle(v.id)} style={{ background:'#ef4444', color:'white', border:'none', borderRadius:6, padding:'6px 10px', fontSize:12, cursor:'pointer' }}>Sil</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display:'flex', justifyContent: "flex-end", gap:12 }}>
+                {editingId && (
+                  <button type="button" onClick={resetForm} style={{ border:'1px solid #d1d5db', background:'white', color:'#6b7280', borderRadius:6, padding:'8px 16px', cursor:'pointer' }}>İptal</button>
+                )}
                 <button
                   type="submit"
                   disabled={submitting}
@@ -535,7 +667,7 @@ const CarrierListPage: React.FC = () => {
                     cursor: submitting ? "not-allowed" : "pointer"
                   }}
                 >
-                  {submitting ? "Ekleniyor..." : "+ Taşıyıcı Ekle"}
+                  {submitting ? (editingId ? 'Güncelleniyor...' : 'Ekleniyor...') : (editingId ? 'Güncelle' : '+ Taşıyıcı Ekle')}
                 </button>
               </div>
             </form>
@@ -634,7 +766,7 @@ const CarrierListPage: React.FC = () => {
                         color: "#374151",
                         borderBottom: "1px solid #e5e7eb"
                       }}>
-                        Plaka
+                        Araç Sayısı
                       </th>
                       <th style={{
                         padding: "12px 16px",
@@ -674,7 +806,7 @@ const CarrierListPage: React.FC = () => {
                         color: "#374151",
                         borderBottom: "1px solid #e5e7eb"
                       }}>
-                        Icon & Text
+                        İşlemler
                       </th>
                     </tr>
                   </thead>
@@ -714,13 +846,8 @@ const CarrierListPage: React.FC = () => {
                         }}>
                           {carrier.iban}
                         </td>
-                        <td style={{
-                          padding: "16px",
-                          fontSize: "14px",
-                          color: "#374151",
-                          fontWeight: "600"
-                        }}>
-                          {carrier.vehicles?.[0]?.plaka || '-'}
+                        <td style={{ padding: "16px", fontSize: "14px", color: "#374151", fontWeight: 600 }}>
+                          {carrier.vehicles?.length ?? 0}
                         </td>
                         <td style={{
                           padding: "16px",
@@ -747,43 +874,9 @@ const CarrierListPage: React.FC = () => {
                           padding: "16px",
                           textAlign: "center"
                         }}>
-                          <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-                            <button
-                              onClick={() => router.push(`/dashboard/carriers/${carrier.id}`)}
-                              style={{
-                                background: "#3b82f6",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "4px",
-                                width: "32px",
-                                height: "32px",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center"
-                              }}
-                            >
-                              📝
-                            </button>
-                            {user?.role === 'admin' && (
-                              <button
-                                onClick={() => handleDelete(carrier.id, carrier.firmaAdi)}
-                                style={{
-                                  background: "#ef4444",
-                                  color: "white",
-                                  border: "none",
-                                  borderRadius: "4px",
-                                  width: "32px",
-                                  height: "32px",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center"
-                                }}
-                              >
-                                🗑️
-                              </button>
-                            )}
+                          <div style={{ display: "flex", gap: 8, justifyContent: 'center' }}>
+                            <button onClick={() => handleEdit(carrier)} style={{ background:'transparent', border:'1px solid #d1d5db', borderRadius:6, padding:'6px 10px', fontSize:12, color:'#6b7280', cursor:'pointer' }}>Düzenle</button>
+                            <button onClick={() => handleDelete(carrier.id, carrier.firmaAdi)} style={{ background:'#ef4444', border:'none', borderRadius:6, padding:'6px 10px', fontSize:12, color:'white', cursor:'pointer' }}>Sil</button>
                           </div>
                         </td>
                       </tr>

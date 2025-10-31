@@ -117,12 +117,7 @@ const LoginPage: React.FC = () => {
           boxShadow: '0 6px 20px -4px rgba(15,23,42,0.08),0 2px 4px rgba(15,23,42,0.06)'
         }}>
           <div style={{ textAlign: 'center', marginBottom: 36 }}>
-            <div style={{
-              fontSize: 30,
-              fontWeight: 600,
-              fontStyle: 'italic',
-              color: '#3b82f6'
-            }}>logo</div>
+            <img src="/uygulamaicon.jpeg" alt="logo" style={{ height: 64, width: 'auto' }} />
             <h2 style={{
               fontSize: 24,
               fontWeight: 600,
