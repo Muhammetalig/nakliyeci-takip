@@ -118,9 +118,13 @@ const OperationsPage: React.FC = () => {
   // Operasyonları filtrele
   const filteredOperations = operations.filter(operation => {
     const matchesTab = activeTab === 'active' ? operation.isActive : !operation.isActive;
-    // carrierName undefined olabilir, bu durumu güvenli şekilde ele al
+    // carrierName ve seferNo undefined olabilir, bu durumu güvenli şekilde ele al
     const carrierName = operation.carrierName || '';
-    const matchesSearch = carrierName.toLowerCase().includes(searchTerm.toLowerCase());
+    const seferNo = operation.seferNo || '';
+    const searchLower = searchTerm.toLowerCase();
+    // Hem taşıyıcı adında hem de sefer no'da ara
+    const matchesSearch = carrierName.toLowerCase().includes(searchLower) || 
+                          seferNo.toLowerCase().includes(searchLower);
     const matchesStatus = !statusFilter || operation.status === statusFilter;
     
     let matchesDate = true;
@@ -537,7 +541,7 @@ const OperationsPage: React.FC = () => {
             <div style={{ position: "relative", minWidth: "280px" }}>
               <input
                 type="text"
-                placeholder="Taşıyıcıda ara..."
+                placeholder="Sefer No veya Taşıyıcı ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{

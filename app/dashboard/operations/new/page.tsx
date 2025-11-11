@@ -92,13 +92,49 @@ const NewOperationPage: React.FC = () => {
   });
   const [form, setForm] = useState<Partial<OperationFormData & { elleclemeFaturasi?: boolean; hammaliyeFaturasi?: boolean }>>(getInitialForm());
   const [submitting, setSubmitting] = useState(false);
+  const [importedRows, setImportedRows] = useState<Array<Partial<OperationFormData & { elleclemeFaturasi?: boolean; hammaliyeFaturasi?: boolean }>>>([]);
+  const [importedDocs, setImportedDocs] = useState<Record<number, Record<DocumentType, LocalDoc>>>({});
+  // Zorunlu alanları kontrol et
+  const validateForm = (data: Partial<OperationFormData>): boolean => {
+    return Boolean(
+      data.seferNo && String(data.seferNo).trim() &&
+      data.carrierId && String(data.carrierId).trim() &&
+      data.carrierName && String(data.carrierName).trim() &&
+      data.vehiclePlaka && String(data.vehiclePlaka).trim() &&
+      data.vehicleType && String(data.vehicleType).trim() &&
+      data.yuklemetarihi &&
+      data.bosaltmaTarihi &&
+      data.siparisTarihi &&
+      data.cikisNoktasi && String(data.cikisNoktasi).trim() &&
+      data.varisNoktasi && String(data.varisNoktasi).trim() &&
+      data.yuklemeAdresi && String(data.yuklemeAdresi).trim() &&
+      data.varisAdresi && String(data.varisAdresi).trim() &&
+      data.musteriAdi && String(data.musteriAdi).trim() &&
+      data.gondericifirma && String(data.gondericifirma).trim() &&
+      data.aliciirma && String(data.aliciirma).trim() &&
+      data.siparisNo && String(data.siparisNo).trim() &&
+      data.irsaliyeNo && String(data.irsaliyeNo).trim() &&
+      data.faturaNo && String(data.faturaNo).trim() &&
+      data.malzemeBilgisi && String(data.malzemeBilgisi).trim() &&
+      data.soforAdi && String(data.soforAdi).trim() &&
+      data.soforTelefonu && String(data.soforTelefonu).trim() &&
+      typeof data.adet === 'number' && data.adet >= 0 &&
+      typeof data.kg === 'number' && data.kg >= 0 &&
+      typeof data.yukAgirligi === 'number' && data.yukAgirligi >= 0 &&
+      typeof data.toplamTutar === 'number' && data.toplamTutar > 0 &&
+      typeof data.aracMaliyeti === 'number' && data.aracMaliyeti >= 0 &&
+      typeof data.navlunSatisTutari === 'number' && data.navlunSatisTutari >= 0
+    );
+  };
+
   const isSaveReady = useMemo(() => {
     return Boolean(
       form.seferNo &&
       selectedCarrierId &&
-      ((form.vehicleId && String(form.vehicleId).length > 0) || (manualVehicle.plaka && manualVehicle.plaka.trim().length > 0))
+      ((form.vehicleId && String(form.vehicleId).length > 0) || (manualVehicle.plaka && manualVehicle.plaka.trim().length > 0)) &&
+      validateForm({ ...form, carrierId: selectedCarrierId, carrierName: carriers.find(c => c.id === selectedCarrierId)?.firmaAdi })
     );
-  }, [form.seferNo, selectedCarrierId, form.vehicleId, manualVehicle.plaka]);
+  }, [form, selectedCarrierId, carriers, manualVehicle.plaka]);
 
   // Yardımcı: Promise için zaman aşımı uygula
   const withTimeout = async <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
@@ -171,70 +207,68 @@ const NewOperationPage: React.FC = () => {
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<ExcelRow>(ws);
     if (!rows.length) return toast.error('Excel boş');
-    const r = rows[0];
 
-    // Araç plakasına göre nakliyeci/araç eşlemesi
-    let matchedCarrier: Carrier | undefined;
-    let matchedVehicle: Vehicle | undefined;
-    const plate = String(asString(r['vehiclePlaka']) || '').trim();
-    if (plate) {
-      for (const c of carriers) {
-        const v = (c.vehicles || []).find(v => v.plaka === plate);
-        if (v) { matchedCarrier = c; matchedVehicle = v; break; }
+    const parseRow = (r: ExcelRow) => {
+      // Araç plakasına göre nakliyeci/araç eşlemesi
+      let matchedCarrier: Carrier | undefined;
+      let matchedVehicle: Vehicle | undefined;
+      const plate = String(asString(r['vehiclePlaka']) || '').trim();
+      if (plate) {
+        for (const c of carriers) {
+          const v = (c.vehicles || []).find(v => v.plaka === plate);
+          if (v) { matchedCarrier = c; matchedVehicle = v; break; }
+        }
       }
-    }
 
-    if (matchedCarrier) {
-      setSelectedCarrierId(matchedCarrier.id);
-      handleChange('carrierId', matchedCarrier.id);
-      handleChange('carrierName', matchedCarrier.firmaAdi);
-    }
-    if (matchedVehicle) {
-      handleChange('vehicleId', matchedVehicle.id);
-      handleChange('vehiclePlaka', matchedVehicle.plaka);
-      handleChange('vehicleType', matchedVehicle.aracTipi);
-    }
+      const gS = (k: string) => asString(r[k]);
+      const gN = (k: string) => asNumber(r[k]);
+      const gD = (k: string) => asDate(r[k]);
 
-    const gS = (k: string) => asString(r[k]);
-    const gN = (k: string) => asNumber(r[k]);
-    const gD = (k: string) => asDate(r[k]);
+      return {
+        seferNo: gS('seferNo') ?? '',
+        tasimaTipi: (gS('tasimaTipi') as OperationFormData['tasimaTipi'] | undefined) ?? 'FTL',
+        carrierId: matchedCarrier?.id ?? '',
+        carrierName: matchedCarrier?.firmaAdi ?? '',
+        vehicleId: matchedVehicle?.id ?? '',
+        vehiclePlaka: matchedVehicle?.plaka ?? gS('vehiclePlaka') ?? '',
+        vehicleType: matchedVehicle?.aracTipi ?? gS('vehicleType') ?? 'Tır',
+        cekiciPlaka: gS('cekiciPlaka') ?? '',
+        dorsePlaka: gS('dorsePlaka') ?? '',
+        yuklemetarihi: gD('yuklemeTarihi') ?? new Date(),
+        cikisNoktasi: gS('cikisNoktasi') ?? '',
+        varisNoktasi: gS('varisNoktasi') ?? '',
+        bosaltmaTarihi: gD('bosaltmaTarihi') ?? new Date(),
+        yuklemeAdresi: gS('yuklemeAdresi') ?? '',
+        varisAdresi: gS('varisAdresi') ?? '',
+        musteriAdi: gS('musteriAdi') ?? '',
+        gondericifirma: gS('gondericiFirma') ?? '',
+        aliciirma: gS('aliciFirma') ?? '',
+        tedarikciirma: gS('tedarikciFirma') ?? '',
+        siparisTarihi: gD('siparisTarihi') ?? new Date(),
+        siparisNo: gS('siparisNo') ?? '',
+        irsaliyeNo: gS('irsaliyeNo') ?? '',
+        faturaNo: gS('faturaNo') ?? '',
+        adet: gN('adet') ?? 0,
+        kg: gN('kg') ?? 0,
+        desi: gN('desi') ?? 0,
+        yukAgirligi: gN('yukAgirligi') ?? 0,
+        malzemeBilgisi: gS('malzemeBilgisi') ?? '',
+        malBedeli: gN('malBedeli') ?? 0,
+        toplamTutar: gN('toplamTutar') ?? 0,
+        paraBirimi: (gS('paraBirimi') as OperationFormData['paraBirimi'] | undefined) ?? 'TRY',
+        vadeSuresi: gN('vadeSuresi') ?? 0,
+        soforAdi: gS('soforAdi') ?? '',
+        soforTelefonu: gS('soforTelefonu') ?? '',
+        aracMaliyeti: gN('aracMaliyeti') ?? 0,
+        navlunSatisTutari: gN('navlunSatisTutari') ?? 0,
+        elleclemeFaturasi: false,
+        hammaliyeFaturasi: false
+      };
+    };
 
-    setForm(prev => ({
-      ...prev,
-  seferNo: gS('seferNo') ?? prev.seferNo,
-  tasimaTipi: (gS('tasimaTipi') as OperationFormData['tasimaTipi'] | undefined) ?? prev.tasimaTipi,
-      cekiciPlaka: gS('cekiciPlaka') ?? prev.cekiciPlaka,
-      dorsePlaka: gS('dorsePlaka') ?? prev.dorsePlaka,
-      yuklemetarihi: gD('yuklemeTarihi') ?? prev.yuklemetarihi,
-      cikisNoktasi: gS('cikisNoktasi') ?? prev.cikisNoktasi,
-      varisNoktasi: gS('varisNoktasi') ?? prev.varisNoktasi,
-      bosaltmaTarihi: gD('bosaltmaTarihi') ?? prev.bosaltmaTarihi,
-      yuklemeAdresi: gS('yuklemeAdresi') ?? prev.yuklemeAdresi,
-      varisAdresi: gS('varisAdresi') ?? prev.varisAdresi,
-      musteriAdi: gS('musteriAdi') ?? prev.musteriAdi,
-      gondericifirma: gS('gondericiFirma') ?? prev.gondericifirma,
-      aliciirma: gS('aliciFirma') ?? prev.aliciirma,
-      tedarikciirma: gS('tedarikciFirma') ?? prev.tedarikciirma,
-      siparisTarihi: gD('siparisTarihi') ?? prev.siparisTarihi,
-      siparisNo: gS('siparisNo') ?? prev.siparisNo,
-      irsaliyeNo: gS('irsaliyeNo') ?? prev.irsaliyeNo,
-      faturaNo: gS('faturaNo') ?? prev.faturaNo,
-      adet: gN('adet') ?? prev.adet ?? 0,
-      kg: gN('kg') ?? prev.kg ?? 0,
-      desi: gN('desi') ?? prev.desi ?? 0,
-      yukAgirligi: gN('yukAgirligi') ?? prev.yukAgirligi ?? 0,
-      malzemeBilgisi: gS('malzemeBilgisi') ?? prev.malzemeBilgisi,
-      malBedeli: gN('malBedeli') ?? prev.malBedeli ?? 0,
-      toplamTutar: gN('toplamTutar') ?? prev.toplamTutar ?? 0,
-  paraBirimi: (gS('paraBirimi') as OperationFormData['paraBirimi'] | undefined) ?? prev.paraBirimi,
-      vadeSuresi: gN('vadeSuresi') ?? prev.vadeSuresi ?? 0,
-      soforAdi: gS('soforAdi') ?? prev.soforAdi,
-      soforTelefonu: gS('soforTelefonu') ?? prev.soforTelefonu,
-      aracMaliyeti: gN('aracMaliyeti') ?? prev.aracMaliyeti ?? 0,
-      navlunSatisTutari: gN('navlunSatisTutari') ?? prev.navlunSatisTutari ?? 0
-    }));
-
-    toast.success('Excel verileri forma aktarıldı');
+    const parsed = rows.map(parseRow);
+    setImportedRows(parsed);
+    toast.success(`${parsed.length} satır yüklendi`);
   };
 
   const onSave = async (e: React.FormEvent) => {
@@ -246,6 +280,12 @@ const NewOperationPage: React.FC = () => {
     const vehicle = selectedVehicle || (manualVehicle.plaka ? { id: `manual-${crypto.randomUUID()}`, plaka: manualVehicle.plaka, aracTipi: manualVehicle.aracTipi } as Vehicle : undefined);
 
     if (!vehicle) return toast.error('Araç seçin veya manuel ekleyin');
+
+    // Tüm zorunlu alanları kontrol et
+    const formData = { ...form, carrierId: selectedCarrierId, carrierName: carriers.find(c => c.id === selectedCarrierId)?.firmaAdi, vehiclePlaka: vehicle.plaka, vehicleType: vehicle.aracTipi };
+    if (!validateForm(formData)) {
+      return toast.error('Lütfen tüm zorunlu alanları doldurun (Tarihler, Lokasyonlar, Firma Bilgileri, Sefer Detayları)');
+    }
 
     try {
       if (submitting) return; // Çift tıklamayı önle
@@ -427,26 +467,17 @@ const NewOperationPage: React.FC = () => {
       <main style={{ marginLeft: 240, flex: 1 }}>
         <header style={{ background: 'white', padding: '16px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ fontSize: 18, fontWeight: 600, color: '#1f2937', margin: 0 }}>Yeni Operasyon</h1>
-          {/** Şimdilik gerek olmadığı için üst aksiyon butonlarını yorum satırına aldık.
-           *  İçerik: Şablonu İndir, Excel Yükle, Listeye Dön
-           *  Geri almak için aşağıdaki bloğu tekrar aktif hale getirin.
-           */}
-          {false && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={onDownloadTemplate} style={{ background: 'white', border: '1px solid #d1d5db', color: '#374151', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>Şablonu İndir</button>
-              <label style={{ background: 'white', border: '1px solid #d1d5db', color: '#374151', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>
-                Excel Yükle
-                <input type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={(e)=>{ const f=e.target.files?.[0]; if(f) onImportExcel(f); }} />
-              </label>
-              <button onClick={()=>router.push('/dashboard/operations')} style={{ background: 'transparent', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>Listeye Dön</button>
-            </div>
-          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <label style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 500, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              📥 Excel Yükle
+              <input type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={(e)=>{ const f=e.target.files?.[0]; if(f) onImportExcel(f); }} />
+            </label>
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>👤</div>
           </div>
         </header>
 
-        <form onSubmit={onSave} style={{ padding: 32 }}>
+        {importedRows.length === 0 ? (
+          <form onSubmit={onSave} style={{ padding: 32 }}>
           {/* Operasyon & Araç */}
           <section style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: 16 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 12px 0' }}>Operasyon & Araç</h2>
@@ -599,6 +630,266 @@ const NewOperationPage: React.FC = () => {
             <button type='submit' disabled={!isSaveReady || submitting} style={{ background: (!isSaveReady || submitting) ? '#93c5fd' : '#3b82f6', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: (!isSaveReady || submitting) ? 'not-allowed' : 'pointer', opacity: submitting ? 0.85 : 1 }}>{submitting ? 'Kaydediliyor…' : 'Kaydet'}</button>
           </div>
         </form>
+        ) : (
+          <div style={{ padding: 32 }}>
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Excel&apos;den Yüklenen Operasyonlar ({importedRows.length})</h2>
+                  {importedRows.some(row => !validateForm(row as OperationFormData)) && (
+                    <p style={{ fontSize: 13, color: '#ef4444', margin: '4px 0 0 0', fontWeight: 500 }}>
+                      ⚠️ Bazı operasyonlarda eksik bilgi var. Lütfen tüm alanları doldurun.
+                    </p>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setImportedRows([])} style={{ background: 'white', border: '1px solid #d1d5db', color: '#374151', borderRadius: 8, padding: '8px 16px', cursor: 'pointer' }}>İptal</button>
+                  <button 
+                    onClick={async () => {
+                    if (submitting) return;
+                    setSubmitting(true);
+                    let successCount = 0;
+                    for (let i = 0; i < importedRows.length; i++) {
+                      const row = importedRows[i];
+                      
+                      try {
+                        const payload: OperationFormData = {
+                          seferNo: String(row.seferNo || ''),
+                          tasimaTipi: (String(row.tasimaTipi || 'FTL') as OperationFormData['tasimaTipi']),
+                          carrierId: String(row.carrierId || ''),
+                          carrierName: String(row.carrierName || ''),
+                          vehicleId: String(row.vehicleId || ''),
+                          vehiclePlaka: String(row.vehiclePlaka || ''),
+                          vehicleType: String(row.vehicleType || 'Tır'),
+                          cekiciPlaka: String(row.cekiciPlaka || ''),
+                          dorsePlaka: String(row.dorsePlaka || ''),
+                          yuklemetarihi: row.yuklemetarihi instanceof Date ? row.yuklemetarihi : new Date(),
+                          bosaltmaTarihi: row.bosaltmaTarihi instanceof Date ? row.bosaltmaTarihi : new Date(),
+                          siparisTarihi: row.siparisTarihi instanceof Date ? row.siparisTarihi : new Date(),
+                          cikisNoktasi: String(row.cikisNoktasi || ''),
+                          varisNoktasi: String(row.varisNoktasi || ''),
+                          yuklemeAdresi: String(row.yuklemeAdresi || ''),
+                          varisAdresi: String(row.varisAdresi || ''),
+                          musteriAdi: String(row.musteriAdi || ''),
+                          gondericifirma: String(row.gondericifirma || ''),
+                          aliciirma: String(row.aliciirma || ''),
+                          tedarikciirma: String(row.tedarikciirma || ''),
+                          siparisNo: String(row.siparisNo || ''),
+                          irsaliyeNo: String(row.irsaliyeNo || ''),
+                          faturaNo: String(row.faturaNo || ''),
+                          adet: Number(row.adet || 0),
+                          kg: Number(row.kg || 0),
+                          desi: Number(row.desi || 0),
+                          yukAgirligi: Number(row.yukAgirligi || 0),
+                          malzemeBilgisi: String(row.malzemeBilgisi || ''),
+                          malBedeli: Number(row.malBedeli || 0),
+                          toplamTutar: Number(row.toplamTutar || 0),
+                          paraBirimi: (String(row.paraBirimi || 'TRY') as OperationFormData['paraBirimi']),
+                          vadeSuresi: Number(row.vadeSuresi || 0),
+                          soforAdi: String(row.soforAdi || ''),
+                          soforTelefonu: String(row.soforTelefonu || ''),
+                          aracMaliyeti: Number(row.aracMaliyeti || 0),
+                          navlunSatisTutari: Number(row.navlunSatisTutari || 0)
+                        };
+                        const created = await withTimeout(createOperationFromForm(payload), 30000, 'Operasyon oluşturma');
+                        
+                        // Bu satırın belgelerini yükle
+                        const rowDocs = importedDocs[i] || {};
+                        const docsToUpload = docTypes
+                          .filter(({ key }) => rowDocs[key]?.file)
+                          .map(({ key }) => ({ key, file: rowDocs[key].file!, evrakNo: rowDocs[key].evrakNo }));
+                        
+                        if (docsToUpload.length > 0) {
+                          const uploadedDocs: Array<{ id: string; type: DocumentType; evrakNo?: string; fileName: string; fileUrl: string; uploadedAt: Date; uploadedBy: string }> = [];
+                          for (const { key, file, evrakNo } of docsToUpload) {
+                            try {
+                              const url = await withTimeout(
+                                uploadFileResumable(file, 'operations', created.id, key, () => {}),
+                                120000,
+                                `${key} yükleme`
+                              );
+                              uploadedDocs.push({
+                                id: crypto.randomUUID(),
+                                type: key,
+                                evrakNo,
+                                fileName: file.name,
+                                fileUrl: url,
+                                uploadedAt: new Date(),
+                                uploadedBy: ''
+                              });
+                            } catch (err) {
+                              console.error(`${key} yüklenemedi:`, err);
+                            }
+                          }
+                          if (uploadedDocs.length > 0) {
+                            await withTimeout(updateOperation(created.id, { documents: uploadedDocs }), 60000, 'Doküman kaydetme');
+                          }
+                        }
+                        
+                        successCount++;
+                      } catch (e) {
+                        console.error(`${row.seferNo} kaydedilemedi:`, e);
+                      }
+                    }
+                    setSubmitting(false);
+                    toast.success(`${successCount}/${importedRows.length} operasyon kaydedildi`);
+                    setImportedRows([]);
+                    setImportedDocs({});
+                    router.push('/dashboard/operations');
+                  }} 
+                    disabled={submitting || importedRows.some(row => !validateForm(row as OperationFormData))} 
+                    style={{ 
+                      background: (submitting || importedRows.some(row => !validateForm(row as OperationFormData))) ? '#93c5fd' : '#10b981', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: 8, 
+                      padding: '8px 16px', 
+                      cursor: (submitting || importedRows.some(row => !validateForm(row as OperationFormData))) ? 'not-allowed' : 'pointer', 
+                      fontWeight: 500 
+                    }}
+                  >
+                    {submitting ? 'Kaydediliyor...' : 'Tümünü Kaydet'}
+                  </button>
+                </div>
+              </div>
+              <div style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
+                {importedRows.map((row, idx) => {
+                  const isValid = validateForm(row as OperationFormData);
+                  return (
+                  <div key={idx} style={{ border: `2px solid ${isValid ? '#e5e7eb' : '#ef4444'}`, borderRadius: 8, padding: 16, marginBottom: 12, background: isValid ? 'white' : '#fef2f2' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '2px solid #e5e7eb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1f2937', margin: 0 }}>#{idx + 1} - {row.seferNo || 'Sefer No Yok'}</h3>
+                        {!isValid && <span style={{ background: '#ef4444', color: 'white', fontSize: 11, padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>EKSİK BİLGİ</span>}
+                      </div>
+                      <button onClick={() => setImportedRows(prev => prev.filter((_, i) => i !== idx))} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>🗑️ Sil</button>
+                    </div>
+                    
+                    {/* Operasyon & Araç */}
+                    <div style={{ marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Operasyon & Araç</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                        <Field label='Sefer No'><input value={String(row.seferNo||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], seferNo: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Taşıma Tipi'><select value={String(row.tasimaTipi||'FTL')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], tasimaTipi: e.target.value as 'FTL' | 'LTL'}; return n; })} style={smallInput}><option value='FTL'>FTL</option><option value='LTL'>LTL</option></select></Field>
+                        <Field label='Nakliyeci'><input value={String(row.carrierName||'')} disabled style={{...smallInput, background: '#f3f4f6'}} /></Field>
+                        <Field label='Araç Plaka'><input value={String(row.vehiclePlaka||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], vehiclePlaka: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Araç Tipi'><input value={String(row.vehicleType||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], vehicleType: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Çekici Plaka'><input value={String(row.cekiciPlaka||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], cekiciPlaka: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Dorse Plaka'><input value={String(row.dorsePlaka||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], dorsePlaka: e.target.value}; return n; })} style={smallInput} /></Field>
+                      </div>
+                    </div>
+
+                    {/* Tarih & Lokasyon */}
+                    <div style={{ marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Tarih & Lokasyon</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                        <Field label='Yükleme Tarihi'><input type='date' value={toInputDate(row.yuklemetarihi as Date)} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], yuklemetarihi: new Date(e.target.value)}; return n; })} style={smallInput} /></Field>
+                        <Field label='Boşaltma Tarihi'><input type='date' value={toInputDate(row.bosaltmaTarihi as Date)} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], bosaltmaTarihi: new Date(e.target.value)}; return n; })} style={smallInput} /></Field>
+                        <Field label='Çıkış Noktası / İl'><input value={String(row.cikisNoktasi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], cikisNoktasi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Varış Noktası / İl'><input value={String(row.varisNoktasi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], varisNoktasi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Yükleme Adresi'><input value={String(row.yuklemeAdresi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], yuklemeAdresi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Varış Adresi'><input value={String(row.varisAdresi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], varisAdresi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Sipariş Tarihi'><input type='date' value={toInputDate(row.siparisTarihi as Date)} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], siparisTarihi: new Date(e.target.value)}; return n; })} style={smallInput} /></Field>
+                        <Field label='Sipariş No'><input value={String(row.siparisNo||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], siparisNo: e.target.value}; return n; })} style={smallInput} /></Field>
+                      </div>
+                    </div>
+
+                    {/* Firma & Belgeler */}
+                    <div style={{ marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Firma & Belgeler</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                        <Field label='Müşteri Adı'><input value={String(row.musteriAdi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], musteriAdi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Gönderici Firma'><input value={String(row.gondericifirma||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], gondericifirma: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Alıcı Firma'><input value={String(row.aliciirma||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], aliciirma: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Tedarikçi Firma'><input value={String(row.tedarikciirma||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], tedarikciirma: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='İrsaliye No'><input value={String(row.irsaliyeNo||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], irsaliyeNo: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Fatura No'><input value={String(row.faturaNo||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], faturaNo: e.target.value}; return n; })} style={smallInput} /></Field>
+                      </div>
+                    </div>
+
+                    {/* Yük & Finans */}
+                    <div style={{ marginBottom: 16 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Yük & Finans</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                        <Field label='Adet'><input type='number' value={row.adet ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], adet: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Kg'><input type='number' value={row.kg ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], kg: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Desi'><input type='number' value={row.desi ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], desi: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Yük Ağırlığı (kg)'><input type='number' value={row.yukAgirligi ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], yukAgirligi: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Malzeme Bilgisi'><input value={String(row.malzemeBilgisi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], malzemeBilgisi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Mal Bedeli'><input type='number' value={row.malBedeli ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], malBedeli: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Toplam Tutar'><input type='number' value={row.toplamTutar ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], toplamTutar: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Para Birimi'><select value={String(row.paraBirimi||'TRY')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], paraBirimi: e.target.value as 'TRY' | 'USD' | 'EUR'}; return n; })} style={smallInput}><option>TRY</option><option>USD</option><option>EUR</option></select></Field>
+                        <Field label='Vade Süresi (gün)'><input type='number' value={row.vadeSuresi ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], vadeSuresi: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Şoför Adı'><input value={String(row.soforAdi||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], soforAdi: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Şoför Telefonu'><input value={String(row.soforTelefonu||'')} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], soforTelefonu: e.target.value}; return n; })} style={smallInput} /></Field>
+                        <Field label='Araç Maliyeti'><input type='number' value={row.aracMaliyeti ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], aracMaliyeti: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                        <Field label='Navlun Satış Tutarı'><input type='number' value={row.navlunSatisTutari ?? ''} onChange={(e) => setImportedRows(prev => { const n = [...prev]; n[idx] = {...n[idx], navlunSatisTutari: e.target.value ? Number(e.target.value) : 0}; return n; })} style={smallInput} /></Field>
+                      </div>
+                    </div>
+
+                    {/* Evraklar */}
+                    <div style={{ marginBottom: 8 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Evraklar (PDF)</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                        {docTypes.map(({ key, label }) => {
+                          const rowDocs = importedDocs[idx] || {};
+                          const doc = rowDocs[key] || {};
+                          return (
+                            <div key={key} style={{ border: '1px dashed #d1d5db', borderRadius: 8, padding: 10, background: '#fafafa' }}>
+                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6, color: '#374151' }}>{label}</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <input 
+                                  placeholder='Evrak No' 
+                                  value={doc.evrakNo || ''} 
+                                  onChange={(e) => {
+                                    setImportedDocs(prev => ({
+                                      ...prev,
+                                      [idx]: {
+                                        ...(prev[idx] || {}),
+                                        [key]: { ...(prev[idx]?.[key] || {}), evrakNo: e.target.value }
+                                      }
+                                    }));
+                                  }}
+                                  style={{ ...smallInput, fontSize: 11 }} 
+                                />
+                                <label style={{ display: 'inline-block', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', background: 'white', color: '#374151', fontSize: 11, textAlign: 'center', fontWeight: 500 }}>
+                                  {doc.file ? '✓ PDF Seçildi' : 'PDF Seç'}
+                                  <input 
+                                    type='file' 
+                                    accept='application/pdf' 
+                                    style={{ display: 'none' }} 
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) {
+                                        setImportedDocs(prev => ({
+                                          ...prev,
+                                          [idx]: {
+                                            ...(prev[idx] || {}),
+                                            [key]: { ...(prev[idx]?.[key] || {}), file: f, uploadedAt: new Date() }
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                {doc.file && (
+                                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                                    📄 {doc.file.name.substring(0, 20)}{doc.file.name.length > 20 ? '...' : ''}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -612,6 +903,7 @@ const Field: React.FC<{ label: string, children: React.ReactNode }> = ({ label, 
 );
 
 const input: React.CSSProperties = { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' };
+const smallInput: React.CSSProperties = { width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' };
 const section: React.CSSProperties = { background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: 16 };
 const h2: React.CSSProperties = { fontSize: 16, fontWeight: 600, margin: '0 0 12px 0' };
 const grid4: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 };
